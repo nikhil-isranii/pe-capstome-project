@@ -42,3 +42,20 @@ The Gemini key will be stored as `GEMINI_API_KEY` in deployment environment vari
 - Screenshot of this GitHub repository
 - Screenshot of the Pull Request
 - Screenshot of Vercel deployment with the secret value hidden
+## Final Submission Links
+
+- Live app: https://resumeready-seven.vercel.app
+- GitHub repository: https://github.com/nikhil-isranii/pe-capstome-project
+- Documentation pull request: https://github.com/nikhil-isranii/pe-capstome-project/pull/1
+
+## Final Technical Details
+
+- Application: ResumeReady — AI Resume Improver
+- AI provider: Google Gemini API
+- Deployment: Vercel Production
+- Frontend: React, TypeScript, Vite, and Tailwind CSS
+- Security: `GEMINI_API_KEY` is stored securely in Vercel Production environment variables and is never exposed in frontend code.
+
+## Final Testing
+
+The deployed app was tested by entering a target role and resume text, running the analysis, and verifying that AI-generated feedback is returned.
