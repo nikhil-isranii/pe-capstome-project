@@ -20,3 +20,15 @@
 ## Security
 
 Never commit API keys, passwords, tokens, or `.env` files. Store `GEMINI_API_KEY` only in secure environment variables.
+## Final Verification
+
+- Confirmed the production deployment loads at https://resumeready-seven.vercel.app.
+- Confirmed a user can enter a target role, resume text, and an optional job description.
+- Confirmed ResumeReady returns AI-generated resume analysis after the Gemini API integration.
+- Confirmed the Gemini API key is stored as a Vercel Production environment variable and is not exposed in the client.
+- Confirmed the documentation pull request was created and merged into `main`.
+
+## Known Limitations
+
+- AI suggestions are guidance only and should be reviewed by the user before use.
+- Analysis quality depends on the detail and accuracy of the supplied resume and job description.
