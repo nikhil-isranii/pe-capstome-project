@@ -57,3 +57,14 @@ https://resumeready-ai-impro-wb27.bolt.host
 ## Security
 
 Never commit API keys, passwords, tokens, or `.env` files. Gemini API keys will be stored as environment variables when the live AI integration is added.
+## Live Deployment
+
+- Live app: https://resumeready-seven.vercel.app
+- Repository: https://github.com/nikhil-isranii/pe-capstome-project
+- Pull request: https://github.com/nikhil-isranii/pe-capstome-project/pull/1
+
+## AI Integration and Security
+
+Resume analysis is powered by the Google Gemini API through a server-side endpoint.
+
+The Gemini key is stored only as the `GEMINI_API_KEY` Production environment variable in Vercel. It is not included in the repository, browser code, screenshots, or documentation.
