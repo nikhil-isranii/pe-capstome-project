@@ -30,10 +30,13 @@ function findMatches(resumeTokens: string[], keyword: string): boolean {
   if (kwTokens.length === 1) {
     return resumeTokens.includes(kwTokens[0]);
   }
-  // multi-word: check all tokens present
   return kwTokens.every((t) => resumeTokens.includes(t));
 }
 
+/**
+ * Local fallback analysis used only when the server endpoint is unreachable.
+ * Produces the same shape the UI expects.
+ */
 export function analyzeResume(
   targetRole: string,
   resumeText: string,
@@ -41,10 +44,8 @@ export function analyzeResume(
 ): AnalysisResult {
   const resumeTokens = tokenize(resumeText);
   const role = targetRole.trim() || 'the target role';
-  const roleLower = role.toLowerCase();
   const roleTokens = tokenize(role);
 
-  // Match score: based on keyword presence + role word overlap
   const presentKeywords = COMMON_ATS_KEYWORDS.filter((kw) =>
     findMatches(resumeTokens, kw)
   );
@@ -53,13 +54,11 @@ export function analyzeResume(
   const roleWordsFound = roleTokens.filter((t) => resumeTokens.includes(t));
   const roleRatio = roleTokens.length > 0 ? roleWordsFound.length / roleTokens.length : 0.3;
 
-  // Length factor: very short resumes score lower
   const wordCount = resumeTokens.length;
   const lengthFactor = wordCount < 80 ? 0.5 : wordCount < 200 ? 0.8 : 1;
 
   let baseScore = Math.round((keywordRatio * 0.45 + roleRatio * 0.35 + lengthFactor * 0.2) * 100);
 
-  // If job description provided, boost on JD keyword overlap
   if (jobDescription.trim()) {
     const jdTokens = tokenize(jobDescription);
     const jdKeywords = COMMON_ATS_KEYWORDS.filter((kw) => findMatches(jdTokens, kw));
@@ -70,7 +69,6 @@ export function analyzeResume(
 
   baseScore = Math.max(28, Math.min(94, baseScore));
 
-  // Strengths — derived from what's present
   const strengths: string[] = [];
   if (presentKeywords.includes('leadership') || presentKeywords.includes('team')) {
     strengths.push('Shows evidence of leadership and teamwork experience.');
@@ -94,7 +92,6 @@ export function analyzeResume(
     strengths.push('Concise format that recruiters can scan quickly.');
   }
 
-  // Improvements
   const improvements: string[] = [];
   const missing = COMMON_ATS_KEYWORDS.filter((kw) => !presentKeywords.includes(kw));
   const topMissing = missing.slice(0, 3).map((k) => `"${k}"`);
@@ -129,18 +126,13 @@ export function analyzeResume(
     );
   }
 
-  // ATS keywords — present first, then high-value missing
   const atsKeywords = [
     ...presentKeywords.slice(0, 8),
     ...missing.slice(0, 6),
   ].slice(0, 12);
 
-  // Headline
-  const headlineBase = role.replace(/\b(engineer|developer|analyst|manager|specialist|coordinator|designer)\b/gi, '').trim() || role;
   const headline = `${capitalizeWords(role)} | Driven Professional Ready to Contribute`;
-
-  // Summary
-  const summary = buildSummary(role, presentKeywords, wordCount);
+  const summary = buildSummary(role, presentKeywords);
 
   return {
     matchScore: baseScore,
@@ -152,7 +144,7 @@ export function analyzeResume(
   };
 }
 
-function buildSummary(role: string, present: string[], wordCount: number): string {
+function buildSummary(role: string, present: string[]): string {
   const traits: string[] = [];
   if (present.includes('leadership') || present.includes('team')) traits.push('collaborative');
   if (present.includes('data') || present.includes('analysis')) traits.push('analytical');

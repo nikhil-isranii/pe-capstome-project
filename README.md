@@ -19,7 +19,29 @@ ResumeReady is an AI Resume Improver for students and job seekers. It compares a
 - Vite
 - Tailwind CSS
 - Bolt.new for the initial app build
-- Gemini API planned for live AI analysis
+- Google Gemini API (Gemini 2.5 Flash) for live AI analysis, called securely from a serverless Vercel endpoint
+
+## AI Analysis Setup (required for live results)
+
+The resume analysis runs through a serverless endpoint at `/api/analyze`
+(`api/analyze.ts`). The endpoint reads the Gemini API key from the server
+environment only — the key is never sent to, stored in, or read by the browser.
+
+You must configure the Gemini API key as a Vercel environment variable:
+
+1. Get a Gemini API key from Google AI Studio.
+2. In your Vercel project, go to **Settings → Environment Variables** and add:
+   - Name: `GEMINI_API_KEY`
+   - Value: your Gemini API key
+3. Redeploy so the new variable is available to the serverless function.
+
+> Do not use a `VITE_`-prefixed variable for the API key. `VITE_` variables are
+> bundled into the browser and would expose the key to every visitor.
+> `GEMINI_API_KEY` is only ever read inside the serverless endpoint.
+
+If the key is missing or the endpoint is unreachable, the app falls back to a
+built-in local analysis so it stays usable, and shows a notice that live AI is
+not connected.
 
 ## Run Locally
 

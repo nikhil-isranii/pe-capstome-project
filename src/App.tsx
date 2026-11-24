@@ -15,6 +15,16 @@ import {
 } from 'lucide-react';
 import { analyzeResume, type AnalysisResult } from '@/lib/analyze';
 
+interface ApiResponse {
+  error?: string;
+  matchScore?: number;
+  strengths?: string[];
+  gaps?: string[];
+  atsKeywords?: string[];
+  suggestedHeadline?: string;
+  rewrittenSummary?: string;
+}
+
 function App() {
   const [targetRole, setTargetRole] = useState('');
   const [resumeText, setResumeText] = useState('');
@@ -22,9 +32,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState('');
+  const [usedFallback, setUsedFallback] = useState(false);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setError('');
+    setUsedFallback(false);
     if (!targetRole.trim()) {
       setError('Please enter your target role.');
       return;
@@ -40,17 +52,71 @@ function App() {
 
     setLoading(true);
     setResult(null);
-    // Simulate processing for realistic UX
-    setTimeout(() => {
-      const analysis = analyzeResume(targetRole, resumeText, jobDescription);
-      setResult(analysis);
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetRole: targetRole.trim(),
+          resumeText: resumeText.trim(),
+          jobDescription: jobDescription.trim(),
+        }),
+      });
+
+      const data: ApiResponse = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message =
+          data?.error ||
+          (res.status === 429
+            ? 'The AI service is busy right now. Please wait a moment and try again.'
+            : res.status >= 500
+            ? 'The AI service is unavailable. Please try again shortly.'
+            : 'We could not analyze your resume. Please check your entries and try again.');
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
+      // Map Gemini response shape -> UI shape
+      const mapped: AnalysisResult = {
+        matchScore: Math.max(0, Math.min(100, Math.round(Number(data.matchScore) || 0))),
+        strengths: Array.isArray(data.strengths) ? data.strengths.slice(0, 3) : [],
+        improvements: Array.isArray(data.gaps) ? data.gaps.slice(0, 3) : [],
+        atsKeywords: Array.isArray(data.atsKeywords) ? data.atsKeywords : [],
+        headline: typeof data.suggestedHeadline === 'string' ? data.suggestedHeadline : '',
+        summary: typeof data.rewrittenSummary === 'string' ? data.rewrittenSummary : '',
+      };
+
+      // Guard against a structurally empty response
+      if (
+        mapped.strengths.length === 0 &&
+        mapped.improvements.length === 0 &&
+        !mapped.headline &&
+        !mapped.summary
+      ) {
+        setError('The AI service returned an incomplete response. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      setResult(mapped);
       setLoading(false);
-    }, 850);
+    } catch (err) {
+      // Network/endpoint failure: fall back to local sample analysis so the
+      // app remains usable, and flag it so the user knows it is not live AI.
+      const fallback = analyzeResume(targetRole, resumeText, jobDescription);
+      setResult(fallback);
+      setUsedFallback(true);
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
     setResult(null);
     setError('');
+    setUsedFallback(false);
   };
 
   return (
@@ -171,14 +237,24 @@ function App() {
           </div>
 
           <p className="mt-3 text-xs text-navy-400">
-            Tip: try pasting a sample resume if you don't have one handy — the
-            analyzer works on any text.
+            Your resume is analyzed securely on the server and is never stored.
           </p>
         </div>
 
         {/* Results */}
         {result && (
           <div className="mt-8 space-y-6">
+            {usedFallback && (
+              <div className="flex items-start gap-2 text-sm text-navy-700 bg-navy-100 border border-navy-200 rounded-lg px-3 py-2">
+                <AlertCircle size={16} className="mt-0.5 flex-shrink-0 text-navy-500" />
+                <span>
+                  The live AI service could not be reached, so this is an
+                  estimated analysis from the built-in engine. Connect the
+                  Gemini API key on the server for full AI results.
+                </span>
+              </div>
+            )}
+
             {/* Match Score */}
             <ScoreCard score={result.matchScore} />
 
@@ -204,17 +280,21 @@ function App() {
                 <KeyRound size={18} className="text-navy-600" />
                 <h3 className="text-lg font-bold text-navy-800">ATS Keywords</h3>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {result.atsKeywords.map((kw, i) => (
-                  <span
-                    key={kw + i}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-navy-50 border border-navy-200 text-sm text-navy-700 font-medium"
-                  >
-                    <Hash size={12} className="text-teal-500" />
-                    {kw}
-                  </span>
-                ))}
-              </div>
+              {result.atsKeywords.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {result.atsKeywords.map((kw, i) => (
+                    <span
+                      key={kw + i}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-navy-50 border border-navy-200 text-sm text-navy-700 font-medium"
+                    >
+                      <Hash size={12} className="text-teal-500" />
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-navy-400">No keywords returned.</p>
+              )}
             </div>
 
             {/* Headline */}
@@ -293,8 +373,7 @@ function Card({
 }
 
 function ScoreCard({ score }: { score: number }) {
-  const tone =
-    score >= 70 ? 'teal' : score >= 50 ? 'navy' : 'amber';
+  const tone = score >= 70 ? 'teal' : score >= 50 ? 'navy' : 'amber';
   const ring =
     tone === 'teal'
       ? 'text-teal-500'
@@ -379,18 +458,22 @@ function ListCard({
         {icon}
         <h3 className="text-lg font-bold text-navy-800">{title}</h3>
       </div>
-      <ul className="space-y-3">
-        {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <span
-              className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full ${bullet} flex items-center justify-center text-xs font-bold`}
-            >
-              {i + 1}
-            </span>
-            <span className="text-sm text-navy-700 leading-relaxed">{item}</span>
-          </li>
-        ))}
-      </ul>
+      {items.length > 0 ? (
+        <ul className="space-y-3">
+          {items.map((item, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span
+                className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full ${bullet} flex items-center justify-center text-xs font-bold`}
+              >
+                {i + 1}
+              </span>
+              <span className="text-sm text-navy-700 leading-relaxed">{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-navy-400">No items returned.</p>
+      )}
     </div>
   );
 }
